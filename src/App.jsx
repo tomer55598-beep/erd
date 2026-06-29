@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { CheckSquare, Square, Trash2, Plus, Utensils, Droplets, ListTodo, X, RotateCcw, Calendar, Scale, ArrowUp, ArrowDown, Minus, BookOpen, ChevronLeft, History } from "lucide-react";
+import { CheckSquare, Square, Trash2, Plus, Utensils, Droplets, ListTodo, X, RotateCcw, Calendar, Scale, ArrowUp, ArrowDown, Minus, BookOpen, ChevronLeft, History, Pencil } from "lucide-react";
 
 const DEFAULT_WATER_GOAL = 4000; // ml
 const DEFAULT_CALORIE_GOAL = 2200; // kcal
@@ -777,9 +777,11 @@ export default function DayBoard() {
   const [customWater, setCustomWater] = useState("");
   const [dailyWaterGoal, setDailyWaterGoal] = useState(DEFAULT_WATER_GOAL);
   const [waterGoalInput, setWaterGoalInput] = useState(String(DEFAULT_WATER_GOAL));
+  const [isEditingWaterGoal, setIsEditingWaterGoal] = useState(false);
 
   const [dailyCalorieGoal, setDailyCalorieGoal] = useState(DEFAULT_CALORIE_GOAL);
   const [calorieGoalInput, setCalorieGoalInput] = useState(String(DEFAULT_CALORIE_GOAL));
+  const [isEditingCalorieGoal, setIsEditingCalorieGoal] = useState(false);
 
   const [historyRows, setHistoryRows] = useState([]);
 
@@ -1036,6 +1038,7 @@ export default function DayBoard() {
     if (value < 500 || value > 10000) return;
     setDailyCalorieGoal(value);
     setCalorieGoalInput(String(value));
+    setIsEditingCalorieGoal(false);
     await saveKey("dailyCalorieGoal", value);
   };
 
@@ -1063,6 +1066,7 @@ export default function DayBoard() {
     if (value < 500 || value > 10000) return;
     setDailyWaterGoal(value);
     setWaterGoalInput(String(value));
+    setIsEditingWaterGoal(false);
     await saveKey("dailyWaterGoal", value);
   };
 
@@ -1137,7 +1141,7 @@ export default function DayBoard() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-sm hero-date">{formatHebrewDate()}</p>
-              <h1 className="font-display text-3xl mt-1 hero-title">לוח-יום</h1>
+              <h1 className="font-display text-3xl mt-1 hero-title">תכנון יומי</h1>
             </div>
             <div className="hero-pill">
               <span className="hero-dot" />
@@ -1200,6 +1204,8 @@ export default function DayBoard() {
             dailyCalorieGoal={dailyCalorieGoal}
             calorieGoalInput={calorieGoalInput}
             setCalorieGoalInput={setCalorieGoalInput}
+            isEditingCalorieGoal={isEditingCalorieGoal}
+            setIsEditingCalorieGoal={setIsEditingCalorieGoal}
             saveDailyCalorieGoal={saveDailyCalorieGoal}
             savedFoods={savedFoods}
             showLibraryModal={showLibraryModal}
@@ -1215,6 +1221,8 @@ export default function DayBoard() {
             dailyWaterGoal={dailyWaterGoal}
             waterGoalInput={waterGoalInput}
             setWaterGoalInput={setWaterGoalInput}
+            isEditingWaterGoal={isEditingWaterGoal}
+            setIsEditingWaterGoal={setIsEditingWaterGoal}
             saveDailyWaterGoal={saveDailyWaterGoal}
             addWater={addWater}
             customWater={customWater}
@@ -1590,7 +1598,8 @@ function StatChip({ label, value, accent, soft }) {
 
 function FoodView({
   foodForm, setFoodForm, applyAutoFoodEstimate, addFood, foodEntries, deleteFood, totals,
-  dailyCalorieGoal, calorieGoalInput, setCalorieGoalInput, saveDailyCalorieGoal,
+  dailyCalorieGoal, calorieGoalInput, setCalorieGoalInput,
+  isEditingCalorieGoal, setIsEditingCalorieGoal, saveDailyCalorieGoal,
   savedFoods, showLibraryModal, setShowLibraryModal,
 }) {
   const caloriePct = dailyCalorieGoal > 0 ? Math.min(100, Math.round((totals.calories / dailyCalorieGoal) * 100)) : 0;
@@ -1615,22 +1624,52 @@ function FoodView({
             <div className="h-full rounded-full transition-all" style={{ width: `${caloriePct}%`, background: palette.foodAccent }} />
           </div>
         </div>
-        <div className="mt-3 flex gap-2">
-          <input
-            value={calorieGoalInput}
-            onChange={(e) => setCalorieGoalInput(e.target.value)}
-            onBlur={saveDailyCalorieGoal}
-            onKeyDown={(e) => e.key === "Enter" && saveDailyCalorieGoal()}
-            placeholder="יעד קלוריות יומי"
-            inputMode="numeric"
-            type="number"
-            className="flex-1 rounded-xl px-3 py-2 outline-none text-sm"
-            style={{ background: palette.bg, border: `1px solid ${palette.border}` }}
-          />
-          <button onClick={saveDailyCalorieGoal} className="rounded-xl px-3 text-sm font-medium" style={{ background: palette.foodAccent, color: "#fff" }}>
-            שמור יעד
-          </button>
-        </div>
+        {!isEditingCalorieGoal ? (
+          <div className="mt-3 flex items-center justify-between rounded-xl px-3 py-2" style={{ background: palette.bg, border: `1px solid ${palette.border}` }}>
+            <span className="text-sm" style={{ color: palette.mutedInk }}>יעד יומי</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold" style={{ color: palette.foodAccent }}>{dailyCalorieGoal} קל׳</span>
+              <button
+                onClick={() => {
+                  setCalorieGoalInput(String(dailyCalorieGoal));
+                  setIsEditingCalorieGoal(true);
+                }}
+                className="rounded-lg p-1.5"
+                style={{ background: palette.foodAccentSoft, color: palette.foodAccent }}
+                title="עריכת יעד קלוריות"
+              >
+                <Pencil size={14} />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-3 flex gap-2">
+            <input
+              value={calorieGoalInput}
+              onChange={(e) => setCalorieGoalInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && saveDailyCalorieGoal()}
+              placeholder="יעד קלוריות יומי"
+              inputMode="numeric"
+              type="number"
+              className="flex-1 rounded-xl px-3 py-2 outline-none text-sm"
+              style={{ background: palette.bg, border: `1px solid ${palette.border}` }}
+              autoFocus
+            />
+            <button onClick={saveDailyCalorieGoal} className="rounded-xl px-3 text-sm font-medium" style={{ background: palette.foodAccent, color: "#fff" }}>
+              שמור
+            </button>
+            <button
+              onClick={() => {
+                setCalorieGoalInput(String(dailyCalorieGoal));
+                setIsEditingCalorieGoal(false);
+              }}
+              className="rounded-xl px-3 text-sm font-medium"
+              style={{ background: palette.bg, color: palette.mutedInk, border: `1px solid ${palette.border}` }}
+            >
+              ביטול
+            </button>
+          </div>
+        )}
       </Card>
 
       <button
@@ -1953,7 +1992,7 @@ function HistoryView({ historyRows }) {
   );
 }
 
-function WaterView({ totalWater, waterPct, waterGoalReached, dailyWaterGoal, waterGoalInput, setWaterGoalInput, saveDailyWaterGoal, addWater, customWater, setCustomWater, waterEntries, removeWaterEntry }) {
+function WaterView({ totalWater, waterPct, waterGoalReached, dailyWaterGoal, waterGoalInput, setWaterGoalInput, isEditingWaterGoal, setIsEditingWaterGoal, saveDailyWaterGoal, addWater, customWater, setCustomWater, waterEntries, removeWaterEntry }) {
   return (
     <div>
       <Card>
@@ -1986,22 +2025,52 @@ function WaterView({ totalWater, waterPct, waterGoalReached, dailyWaterGoal, wat
 
       <Card>
         <p className="text-sm font-medium mb-2">יעד מים יומי</p>
-        <div className="flex gap-2">
-          <input
-            value={waterGoalInput}
-            onChange={(e) => setWaterGoalInput(e.target.value)}
-            onBlur={saveDailyWaterGoal}
-            onKeyDown={(e) => e.key === "Enter" && saveDailyWaterGoal()}
-            placeholder='יעד במ״ל, למשל 4000'
-            inputMode="numeric"
-            type="number"
-            className="flex-1 rounded-xl px-3 py-2 outline-none"
-            style={{ background: palette.bg, border: `1px solid ${palette.border}` }}
-          />
-          <button onClick={saveDailyWaterGoal} className="rounded-xl px-4 text-sm font-medium" style={{ background: palette.waterAccent, color: "#fff" }}>
-            שמור
-          </button>
-        </div>
+        {!isEditingWaterGoal ? (
+          <div className="flex items-center justify-between rounded-xl px-3 py-2" style={{ background: palette.bg, border: `1px solid ${palette.border}` }}>
+            <span className="text-sm" style={{ color: palette.mutedInk }}>היעד שהוגדר</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold" style={{ color: palette.waterAccent }}>{dailyWaterGoal} מ״ל</span>
+              <button
+                onClick={() => {
+                  setWaterGoalInput(String(dailyWaterGoal));
+                  setIsEditingWaterGoal(true);
+                }}
+                className="rounded-lg p-1.5"
+                style={{ background: palette.waterAccentSoft, color: palette.waterAccent }}
+                title="עריכת יעד מים"
+              >
+                <Pencil size={14} />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <input
+              value={waterGoalInput}
+              onChange={(e) => setWaterGoalInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && saveDailyWaterGoal()}
+              placeholder='יעד במ״ל, למשל 4000'
+              inputMode="numeric"
+              type="number"
+              className="flex-1 rounded-xl px-3 py-2 outline-none"
+              style={{ background: palette.bg, border: `1px solid ${palette.border}` }}
+              autoFocus
+            />
+            <button onClick={saveDailyWaterGoal} className="rounded-xl px-4 text-sm font-medium" style={{ background: palette.waterAccent, color: "#fff" }}>
+              שמור
+            </button>
+            <button
+              onClick={() => {
+                setWaterGoalInput(String(dailyWaterGoal));
+                setIsEditingWaterGoal(false);
+              }}
+              className="rounded-xl px-3 text-sm font-medium"
+              style={{ background: palette.bg, color: palette.mutedInk, border: `1px solid ${palette.border}` }}
+            >
+              ביטול
+            </button>
+          </div>
+        )}
         <p className="text-[11px] mt-2" style={{ color: palette.mutedInk }}>היעד נשמר במכשיר וישפיע על כל יום קדימה.</p>
       </Card>
 
