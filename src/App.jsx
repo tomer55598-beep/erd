@@ -5,19 +5,19 @@ const WATER_GOAL = 4000; // ml
 const WATER_QUICK_ADDS = [200, 330, 500];
 
 const palette = {
-  bg: "#F6F1E7",
-  surface: "#FFFFFF",
-  border: "#E7DECB",
-  ink: "#2B2A28",
-  mutedInk: "#8C8374",
-  tasksAccent: "#5C7A5E",
-  tasksAccentSoft: "#E4ECE2",
-  foodAccent: "#C16A3E",
-  foodAccentSoft: "#F6E3D6",
-  waterAccent: "#3C6E96",
-  waterAccentSoft: "#DCEBF4",
-  weightAccent: "#7C5A65",
-  weightAccentSoft: "#EFE1E5",
+  bg: "#F8F3EB",
+  surface: "#FFFDF8",
+  border: "#E7D9C8",
+  ink: "#27231F",
+  mutedInk: "#887B6A",
+  tasksAccent: "#4F7A58",
+  tasksAccentSoft: "#E7F0E7",
+  foodAccent: "#C66735",
+  foodAccentSoft: "#F8E2D2",
+  waterAccent: "#2F75A8",
+  waterAccentSoft: "#DDEFF8",
+  weightAccent: "#83586A",
+  weightAccentSoft: "#F0E1E7",
   danger: "#B5544A",
 };
 
@@ -1086,8 +1086,15 @@ export default function DayBoard() {
     history: { label: "היסטוריה", icon: History, accent: palette.ink },
   };
 
+  const openTasksCount = tasks.filter((t) => !isTaskDone(t)).length;
+  const todayCalories = Math.round(foodTotals.calories || 0);
+  const waterLiters = (totalWater / 1000).toFixed(1);
+  const currentTabAccent = tabMeta[tab]?.accent || palette.ink;
+
   return (
-    <div dir="rtl" className="min-h-screen pb-24" style={{ background: palette.bg, fontFamily: "Rubik, sans-serif", color: palette.ink }}>
+    <div dir="rtl" className="min-h-screen pb-24 app-shell" style={{ background: palette.bg, fontFamily: "Rubik, sans-serif", color: palette.ink, "--active-accent": currentTabAccent }}>
+      <div className="bg-blob bg-blob-a" />
+      <div className="bg-blob bg-blob-b" />
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Rubik:wght@400;500;600;700&display=swap');
         .font-display { font-family: 'Frank Ruhl Libre', serif; }
@@ -1097,12 +1104,37 @@ export default function DayBoard() {
       `}</style>
 
       {/* header */}
-      <header className="px-5 pt-6 pb-4 max-w-xl mx-auto">
-        <p className="text-sm" style={{ color: palette.mutedInk }}>{formatHebrewDate()}</p>
-        <h1 className="font-display text-3xl mt-1" style={{ color: palette.ink }}>לוח-יום</h1>
+      <header className="px-5 pt-6 pb-4 max-w-xl mx-auto app-header">
+        <div className="hero-card">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm hero-date">{formatHebrewDate()}</p>
+              <h1 className="font-display text-3xl mt-1 hero-title">לוח-יום</h1>
+            </div>
+            <div className="hero-pill">
+              <span className="hero-dot" />
+              היום
+            </div>
+          </div>
+
+          <div className="hero-stats">
+            <div className="hero-stat">
+              <span>{openTasksCount}</span>
+              <small>משימות פתוחות</small>
+            </div>
+            <div className="hero-stat">
+              <span>{todayCalories}</span>
+              <small>קלוריות היום</small>
+            </div>
+            <div className="hero-stat">
+              <span>{waterLiters} ל׳</span>
+              <small>מים</small>
+            </div>
+          </div>
+        </div>
       </header>
 
-      <main className="px-5 max-w-xl mx-auto">
+      <main className="px-5 max-w-xl mx-auto app-main">
         {tab === "tasks" && (
           <TasksView
             tasks={tasks}
@@ -1188,11 +1220,8 @@ export default function DayBoard() {
       )}
 
       {/* bottom tab bar */}
-      <nav
-        className="fixed bottom-0 left-0 right-0 flex justify-center"
-        style={{ background: palette.surface, borderTop: `1px solid ${palette.border}` }}
-      >
-        <div className="max-w-xl w-full flex">
+      <nav className="fixed bottom-0 left-0 right-0 flex justify-center bottom-nav">
+        <div className="max-w-xl w-full flex bottom-nav-inner">
           {Object.entries(tabMeta).map(([key, meta]) => {
             const Icon = meta.icon;
             const active = tab === key;
@@ -1200,11 +1229,13 @@ export default function DayBoard() {
               <button
                 key={key}
                 onClick={() => setTab(key)}
-                className="flex-1 flex flex-col items-center gap-1 py-3"
+                className={`flex-1 flex flex-col items-center gap-1 py-3 tab-button ${active ? "tab-button-active" : ""}`}
                 style={{ color: active ? meta.accent : palette.mutedInk }}
               >
-                <Icon size={20} strokeWidth={active ? 2.4 : 1.8} />
-                <span className="text-[11px]" style={{ fontWeight: active ? 600 : 400 }}>{meta.label}</span>
+                <span className="tab-icon-wrap">
+                  <Icon size={20} strokeWidth={active ? 2.5 : 1.8} />
+                </span>
+                <span className="text-[11px] tab-label" style={{ fontWeight: active ? 700 : 500 }}>{meta.label}</span>
               </button>
             );
           })}
@@ -1216,7 +1247,7 @@ export default function DayBoard() {
 
 function Card({ children }) {
   return (
-    <div className="rounded-2xl p-4 mb-4" style={{ background: palette.surface, border: `1px solid ${palette.border}` }}>
+    <div className="rounded-2xl p-4 mb-4 app-card" style={{ background: palette.surface, border: `1px solid ${palette.border}` }}>
       {children}
     </div>
   );
@@ -1647,7 +1678,7 @@ function FoodView({
       ) : (
         <div className="space-y-2">
           {foodEntries.map((f) => (
-            <div key={f.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ background: palette.surface, border: `1px solid ${palette.border}` }}>
+            <div key={f.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5 list-row" style={{ background: palette.surface, border: `1px solid ${palette.border}` }}>
               <div className="flex-1">
                 <p className="text-sm font-medium">{f.name}</p>
                 {getFoodProfileLabel(f) && (
@@ -1765,7 +1796,7 @@ function ProductLibraryModal({
           ) : (
             <div className="space-y-2 pb-2">
               {savedFoods.map((p) => (
-                <div key={p.id} className="flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: palette.bg, border: `1px solid ${palette.border}` }}>
+                <div key={p.id} className="flex items-center gap-2 rounded-xl px-3 py-2 list-row" style={{ background: palette.bg, border: `1px solid ${palette.border}` }}>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{p.name}</p>
                     <p className="text-[11px]" style={{ color: palette.mutedInk }}>
@@ -1929,7 +1960,7 @@ function WaterView({ totalWater, waterPct, waterGoalReached, addWater, customWat
       {waterEntries.length > 0 && (
         <div className="space-y-2">
           {waterEntries.slice().reverse().map((w) => (
-            <div key={w.id} className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm" style={{ background: palette.surface, border: `1px solid ${palette.border}` }}>
+            <div key={w.id} className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm list-row" style={{ background: palette.surface, border: `1px solid ${palette.border}` }}>
               <Droplets size={14} style={{ color: palette.waterAccent }} />
               <span className="flex-1">{w.amount + ' מ"ל · ' + w.time}</span>
               <button onClick={() => removeWaterEntry(w.id)} style={{ color: palette.mutedInk }}>
@@ -2007,7 +2038,7 @@ function WeightView({ weightEntries, weightDate, setWeightDate, weightValue, set
       {rowsDesc.length > 0 && (
         <div className="space-y-2">
           {rowsDesc.map((w) => (
-            <div key={w.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ background: palette.surface, border: `1px solid ${palette.border}` }}>
+            <div key={w.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5 list-row" style={{ background: palette.surface, border: `1px solid ${palette.border}` }}>
               <div className="flex-1 flex items-center gap-3">
                 <span className="text-sm font-medium">{w.weight} ק"ג</span>
                 <span className="text-[11px]" style={{ color: palette.mutedInk }}>{formatShortDate(w.date)}</span>
