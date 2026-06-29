@@ -1,6 +1,6 @@
 {
-  "name": "לוח-יום",
-  "short_name": "לוח-יום",
+  "name": "תכנון יומי",
+  "short_name": "תכנון יומי",
   "description": "משימות, תזונה, מים, משקל והיסטוריה יומית.",
   "start_url": "/",
   "display": "standalone",
