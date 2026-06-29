@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { CheckSquare, Square, Trash2, Plus, Utensils, Droplets, ListTodo, X, RotateCcw, Calendar, Scale, ArrowUp, ArrowDown, Minus, BookOpen, ChevronLeft, History } from "lucide-react";
 
-const WATER_GOAL = 4000; // ml
+const DEFAULT_WATER_GOAL = 4000; // ml
+const DEFAULT_CALORIE_GOAL = 2200; // kcal
 const WATER_QUICK_ADDS = [200, 330, 500];
 
 const palette = {
@@ -774,6 +775,11 @@ export default function DayBoard() {
 
   const [waterEntries, setWaterEntries] = useState([]);
   const [customWater, setCustomWater] = useState("");
+  const [dailyWaterGoal, setDailyWaterGoal] = useState(DEFAULT_WATER_GOAL);
+  const [waterGoalInput, setWaterGoalInput] = useState(String(DEFAULT_WATER_GOAL));
+
+  const [dailyCalorieGoal, setDailyCalorieGoal] = useState(DEFAULT_CALORIE_GOAL);
+  const [calorieGoalInput, setCalorieGoalInput] = useState(String(DEFAULT_CALORIE_GOAL));
 
   const [historyRows, setHistoryRows] = useState([]);
 
@@ -805,6 +811,8 @@ export default function DayBoard() {
       const w = await loadKey(`water:${dateKey}`, []);
       const wt = await loadKey("weight", []);
       const lib = await loadKey("foodLibrary", []);
+      const savedWaterGoal = await loadKey("dailyWaterGoal", DEFAULT_WATER_GOAL);
+      const savedCalorieGoal = await loadKey("dailyCalorieGoal", DEFAULT_CALORIE_GOAL);
       let histDates = await loadKey("dailyHistoryDates", []);
       if ((f.length > 0 || w.length > 0) && !histDates.includes(dateKey)) {
         histDates = await addDateToHistory(dateKey);
@@ -815,6 +823,10 @@ export default function DayBoard() {
       setWaterEntries(w);
       setWeightEntries(wt);
       setSavedFoods(lib);
+      setDailyWaterGoal(Number(savedWaterGoal) || DEFAULT_WATER_GOAL);
+      setWaterGoalInput(String(Number(savedWaterGoal) || DEFAULT_WATER_GOAL));
+      setDailyCalorieGoal(Number(savedCalorieGoal) || DEFAULT_CALORIE_GOAL);
+      setCalorieGoalInput(String(Number(savedCalorieGoal) || DEFAULT_CALORIE_GOAL));
       setHistoryRows(hist);
       setReady(true);
     })();
@@ -1019,6 +1031,14 @@ export default function DayBoard() {
     { calories: 0, protein: 0, fat: 0 }
   );
 
+  const saveDailyCalorieGoal = async () => {
+    const value = Math.round(numberFromInput(calorieGoalInput) || 0);
+    if (value < 500 || value > 10000) return;
+    setDailyCalorieGoal(value);
+    setCalorieGoalInput(String(value));
+    await saveKey("dailyCalorieGoal", value);
+  };
+
   // ---- water ----
   const persistWater = useCallback(async (next) => {
     const currentDate = dateKeyRef.current;
@@ -1038,9 +1058,17 @@ export default function DayBoard() {
     persistWater(waterEntries.filter((w) => w.id !== id));
   };
 
+  const saveDailyWaterGoal = async () => {
+    const value = Math.round(numberFromInput(waterGoalInput) || 0);
+    if (value < 500 || value > 10000) return;
+    setDailyWaterGoal(value);
+    setWaterGoalInput(String(value));
+    await saveKey("dailyWaterGoal", value);
+  };
+
   const totalWater = waterEntries.reduce((sum, w) => sum + w.amount, 0);
-  const waterPct = Math.min(100, Math.round((totalWater / WATER_GOAL) * 100));
-  const waterGoalReached = totalWater >= WATER_GOAL;
+  const waterPct = Math.min(100, Math.round((totalWater / dailyWaterGoal) * 100));
+  const waterGoalReached = totalWater >= dailyWaterGoal;
 
   // ---- weight ----
   const persistWeight = useCallback(async (next) => {
@@ -1124,11 +1152,11 @@ export default function DayBoard() {
             </div>
             <div className="hero-stat">
               <span>{todayCalories}</span>
-              <small>קלוריות היום</small>
+              <small>מתוך {dailyCalorieGoal} קל׳</small>
             </div>
             <div className="hero-stat">
               <span>{waterLiters} ל׳</span>
-              <small>מים</small>
+              <small>מתוך {(dailyWaterGoal / 1000).toFixed(1)} ל׳</small>
             </div>
           </div>
         </div>
@@ -1169,6 +1197,10 @@ export default function DayBoard() {
             foodEntries={foodEntries}
             deleteFood={deleteFood}
             totals={foodTotals}
+            dailyCalorieGoal={dailyCalorieGoal}
+            calorieGoalInput={calorieGoalInput}
+            setCalorieGoalInput={setCalorieGoalInput}
+            saveDailyCalorieGoal={saveDailyCalorieGoal}
             savedFoods={savedFoods}
             showLibraryModal={showLibraryModal}
             setShowLibraryModal={setShowLibraryModal}
@@ -1180,6 +1212,10 @@ export default function DayBoard() {
             totalWater={totalWater}
             waterPct={waterPct}
             waterGoalReached={waterGoalReached}
+            dailyWaterGoal={dailyWaterGoal}
+            waterGoalInput={waterGoalInput}
+            setWaterGoalInput={setWaterGoalInput}
+            saveDailyWaterGoal={saveDailyWaterGoal}
             addWater={addWater}
             customWater={customWater}
             setCustomWater={setCustomWater}
@@ -1554,16 +1590,46 @@ function StatChip({ label, value, accent, soft }) {
 
 function FoodView({
   foodForm, setFoodForm, applyAutoFoodEstimate, addFood, foodEntries, deleteFood, totals,
+  dailyCalorieGoal, calorieGoalInput, setCalorieGoalInput, saveDailyCalorieGoal,
   savedFoods, showLibraryModal, setShowLibraryModal,
 }) {
+  const caloriePct = dailyCalorieGoal > 0 ? Math.min(100, Math.round((totals.calories / dailyCalorieGoal) * 100)) : 0;
+  const caloriesLeft = Math.round(dailyCalorieGoal - totals.calories);
   return (
     <div>
       <Card>
         <p className="text-xs mb-2" style={{ color: palette.mutedInk }}>סיכום היום</p>
         <div className="flex gap-1.5">
-          <StatChip label="קלוריות" value={Math.round(totals.calories)} accent={palette.foodAccent} soft={palette.foodAccentSoft} />
+          <StatChip label="קלוריות" value={`${Math.round(totals.calories)} / ${dailyCalorieGoal}`} accent={palette.foodAccent} soft={palette.foodAccentSoft} />
           <StatChip label='חלבון (ג)' value={Math.round(totals.protein)} accent={palette.foodAccent} soft={palette.foodAccentSoft} />
           <StatChip label='שומן (ג)' value={Math.round(totals.fat)} accent={palette.foodAccent} soft={palette.foodAccentSoft} />
+        </div>
+        <div className="mt-3">
+          <div className="flex items-center justify-between text-[11px] mb-1" style={{ color: palette.mutedInk }}>
+            <span>אכלת {Math.round(totals.calories)} מתוך {dailyCalorieGoal} קל׳</span>
+            <span style={{ color: caloriesLeft >= 0 ? palette.tasksAccent : palette.danger }}>
+              {caloriesLeft >= 0 ? `נשארו ${caloriesLeft}` : `חריגה ${Math.abs(caloriesLeft)}`} קל׳
+            </span>
+          </div>
+          <div className="h-2 rounded-full overflow-hidden" style={{ background: palette.foodAccentSoft }}>
+            <div className="h-full rounded-full transition-all" style={{ width: `${caloriePct}%`, background: palette.foodAccent }} />
+          </div>
+        </div>
+        <div className="mt-3 flex gap-2">
+          <input
+            value={calorieGoalInput}
+            onChange={(e) => setCalorieGoalInput(e.target.value)}
+            onBlur={saveDailyCalorieGoal}
+            onKeyDown={(e) => e.key === "Enter" && saveDailyCalorieGoal()}
+            placeholder="יעד קלוריות יומי"
+            inputMode="numeric"
+            type="number"
+            className="flex-1 rounded-xl px-3 py-2 outline-none text-sm"
+            style={{ background: palette.bg, border: `1px solid ${palette.border}` }}
+          />
+          <button onClick={saveDailyCalorieGoal} className="rounded-xl px-3 text-sm font-medium" style={{ background: palette.foodAccent, color: "#fff" }}>
+            שמור יעד
+          </button>
         </div>
       </Card>
 
@@ -1887,7 +1953,7 @@ function HistoryView({ historyRows }) {
   );
 }
 
-function WaterView({ totalWater, waterPct, waterGoalReached, addWater, customWater, setCustomWater, waterEntries, removeWaterEntry }) {
+function WaterView({ totalWater, waterPct, waterGoalReached, dailyWaterGoal, waterGoalInput, setWaterGoalInput, saveDailyWaterGoal, addWater, customWater, setCustomWater, waterEntries, removeWaterEntry }) {
   return (
     <div>
       <Card>
@@ -1910,12 +1976,33 @@ function WaterView({ totalWater, waterPct, waterGoalReached, addWater, customWat
             <p className="text-2xl font-semibold" style={{ color: palette.waterAccent }}>
               {(totalWater / 1000).toFixed(2)} <span className="text-sm font-normal">ל׳</span>
             </p>
-            <p className="text-xs mb-1" style={{ color: palette.mutedInk }}>מתוך {(WATER_GOAL / 1000).toFixed(0)} ליטר ליום</p>
+            <p className="text-xs mb-1" style={{ color: palette.mutedInk }}>מתוך {(dailyWaterGoal / 1000).toFixed(1)} ליטר ליום</p>
             <p className="text-sm" style={{ color: waterGoalReached ? palette.tasksAccent : palette.mutedInk }}>
-              {waterGoalReached ? "🎉 הגעת ליעד היום!" : `נשארו ${((WATER_GOAL - totalWater) / 1000).toFixed(2)} ל׳`}
+              {waterGoalReached ? "🎉 הגעת ליעד היום!" : `נשארו ${Math.max(0, ((dailyWaterGoal - totalWater) / 1000)).toFixed(2)} ל׳`}
             </p>
           </div>
         </div>
+      </Card>
+
+      <Card>
+        <p className="text-sm font-medium mb-2">יעד מים יומי</p>
+        <div className="flex gap-2">
+          <input
+            value={waterGoalInput}
+            onChange={(e) => setWaterGoalInput(e.target.value)}
+            onBlur={saveDailyWaterGoal}
+            onKeyDown={(e) => e.key === "Enter" && saveDailyWaterGoal()}
+            placeholder='יעד במ״ל, למשל 4000'
+            inputMode="numeric"
+            type="number"
+            className="flex-1 rounded-xl px-3 py-2 outline-none"
+            style={{ background: palette.bg, border: `1px solid ${palette.border}` }}
+          />
+          <button onClick={saveDailyWaterGoal} className="rounded-xl px-4 text-sm font-medium" style={{ background: palette.waterAccent, color: "#fff" }}>
+            שמור
+          </button>
+        </div>
+        <p className="text-[11px] mt-2" style={{ color: palette.mutedInk }}>היעד נשמר במכשיר וישפיע על כל יום קדימה.</p>
       </Card>
 
       <Card>
