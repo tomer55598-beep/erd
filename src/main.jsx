@@ -1,5 +1,6 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
+import { Analytics } from "@vercel/analytics/react";
 import "./storage.js";
 import "./index.css";
 import DayBoard from "./App.jsx";
@@ -7,6 +8,7 @@ import DayBoard from "./App.jsx";
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <DayBoard />
+    <Analytics />
   </React.StrictMode>
 );
 
