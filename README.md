@@ -1,4 +1,4 @@
-# Tomer DayBoard - iPhone Bottom Navigation Fix
+# Tomer Daily Planner
 
 גרסה זו מתקנת את השורה התחתונה באייפון:
 - הניווט התחתון נשאר fixed ולא נפתח/נדחף מוזר.
