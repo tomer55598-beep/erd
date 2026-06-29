@@ -455,7 +455,8 @@ const CALORIE_DATABASE = [
   // שתייה ורטבים
   { name: "קולה", aliases: ["קולה", "קוקה קולה"], calories: 42, protein: 0, fat: 0, category: "שתייה מתוקה" },
   { name: "קולה זירו", aliases: ["זירו", "קולה זירו"], calories: 0, protein: 0, fat: 0, category: "שתייה" },
-  { name: "מיץ", aliases: ["מיץ", "מיץ תפוזים", "מיץ ענבים"], calories: 45, protein: 0.5, fat: 0.1, category: "שתייה מתוקה" },
+  { name: "מיץ תפוזים", aliases: ["מיץ", "מיץ תפוזים", "תפוזים סחוט"], calories: 45, protein: 0.7, fat: 0.2, category: "שתייה מתוקה" },
+  { name: "מיץ ענבים", aliases: ["מיץ ענבים", "תירוש"], calories: 60, protein: 0.3, fat: 0.1, category: "שתייה מתוקה" },
   { name: "בירה", aliases: ["בירה"], calories: 43, protein: 0.5, fat: 0, category: "שתייה אלכוהולית" },
   { name: "שמן זית", aliases: ["שמן", "שמן זית"], calories: 884, protein: 0, fat: 100, category: "שומן" },
   { name: "מיונז", aliases: ["מיונז"], calories: 680, protein: 1, fat: 75, category: "רוטב" },
@@ -469,12 +470,34 @@ function getCalorieDatabaseMatch(name) {
   const cleanedName = cleanFoodName(name);
   const normalized = normalizeFoodText(cleanedName || name);
   if (!normalized) return null;
-  const candidates = CALORIE_DATABASE.flatMap((item) =>
-    [item.name, ...(item.aliases || [])].map((alias) => ({ item, alias, normalizedAlias: normalizeFoodText(alias) }))
-  )
-    .filter((row) => row.normalizedAlias && (normalized.includes(row.normalizedAlias) || row.normalizedAlias.includes(normalized)))
+
+  const rows = CALORIE_DATABASE.flatMap((item) =>
+    [item.name, ...(item.aliases || [])].map((alias) => ({
+      item,
+      alias,
+      normalizedAlias: normalizeFoodText(alias),
+    }))
+  ).filter((row) => row.normalizedAlias);
+
+  const exact = rows
+    .filter((row) => normalized === row.normalizedAlias)
     .sort((a, b) => b.normalizedAlias.length - a.normalizedAlias.length);
-  return candidates[0]?.item || null;
+  if (exact.length) return exact[0].item;
+
+  const wordMatch = rows
+    .filter((row) => normalizedFoodContainsPhrase(normalized, row.normalizedAlias))
+    .sort((a, b) => b.normalizedAlias.length - a.normalizedAlias.length);
+  if (wordMatch.length) return wordMatch[0].item;
+
+  // התאמה הפוכה רק לביטויים ארוכים יחסית, כדי ש"ענבים" לא ייתפס כ"מיץ ענבים".
+  const reverseMatch = rows
+    .filter((row) => normalized.length >= 4 && row.normalizedAlias.length >= 4 && normalizedFoodContainsPhrase(row.normalizedAlias, normalized))
+    .sort((a, b) => {
+      const aPenalty = a.normalizedAlias.length - normalized.length;
+      const bPenalty = b.normalizedAlias.length - normalized.length;
+      return aPenalty - bPenalty || b.normalizedAlias.length - a.normalizedAlias.length;
+    });
+  return reverseMatch[0]?.item || null;
 }
 
 function calculateNutritionFromPer100(item, grams) {
@@ -622,6 +645,12 @@ function normalizeFoodText(text) {
     .trim();
 }
 
+function normalizedFoodContainsPhrase(text, phrase) {
+  const haystack = ` ${normalizeFoodText(text)} `;
+  const needle = ` ${normalizeFoodText(phrase)} `;
+  return needle.trim() && haystack.includes(needle);
+}
+
 function numberFromInput(value) {
   const num = parseFloat(String(value || "").replace(",", "."));
   return Number.isFinite(num) ? num : null;
@@ -668,17 +697,29 @@ function getFoodSuggestionMatch(name) {
   const cleanedName = cleanFoodName(name);
   const normalized = normalizeFoodText(cleanedName || name);
   if (!normalized) return null;
-  return FOOD_SUGGESTIONS.find((item) => normalized.includes(normalizeFoodText(item))) || null;
+  const exact = FOOD_SUGGESTIONS.find((item) => normalizeFoodText(item) === normalized);
+  if (exact) return exact;
+  return FOOD_SUGGESTIONS
+    .filter((item) => normalizedFoodContainsPhrase(normalized, item))
+    .sort((a, b) => normalizeFoodText(b).length - normalizeFoodText(a).length)[0] || null;
 }
 
 function getSavedFoodMatch(savedFoods, name) {
   const cleanedName = cleanFoodName(name);
   const normalized = normalizeFoodText(cleanedName || name);
   if (!normalized) return null;
-  return savedFoods.find((item) => {
-    const productName = normalizeFoodText(item.name);
-    return productName && (normalized.includes(productName) || productName.includes(normalized));
-  }) || null;
+
+  const rows = savedFoods
+    .map((item) => ({ item, productName: normalizeFoodText(item.name) }))
+    .filter((row) => row.productName);
+
+  const exact = rows.find((row) => row.productName === normalized);
+  if (exact) return exact.item;
+
+  const wordMatch = rows
+    .filter((row) => normalizedFoodContainsPhrase(normalized, row.productName))
+    .sort((a, b) => b.productName.length - a.productName.length);
+  return wordMatch[0]?.item || null;
 }
 
 function getDateKey(d = new Date()) {
@@ -1697,7 +1738,11 @@ function FoodView({
         <div className="space-y-2">
           <input
             value={foodForm.name}
-            onChange={(e) => setFoodForm({ ...foodForm, name: e.target.value })}
+            onChange={(e) => {
+              const nextName = e.target.value;
+              const patch = buildAutoFoodFormPatch(nextName, foodForm.grams, savedFoods);
+              setFoodForm({ ...foodForm, name: nextName, ...patch });
+            }}
             placeholder="מה אכלת? למשל: שווארמה 200 גרם / פיצה 150 גרם"
             list="food-suggestions"
             className="w-full rounded-xl px-3 py-2 outline-none"
@@ -1711,7 +1756,11 @@ function FoodView({
           <div className="flex gap-2">
             <input
               value={foodForm.grams}
-              onChange={(e) => setFoodForm({ ...foodForm, grams: e.target.value })}
+              onChange={(e) => {
+                const nextGrams = e.target.value;
+                const patch = buildAutoFoodFormPatch(foodForm.name, nextGrams, savedFoods);
+                setFoodForm({ ...foodForm, grams: nextGrams, ...patch });
+              }}
               placeholder='כמה גרם?'
               inputMode="decimal"
               type="number"
@@ -2011,11 +2060,24 @@ function WaterView({ totalWater, waterPct, waterGoalReached, dailyWaterGoal, wat
               }} />
             </div>
           </div>
-          <div className="flex-1">
-            <p className="text-2xl font-semibold" style={{ color: palette.waterAccent }}>
-              {(totalWater / 1000).toFixed(2)} <span className="text-sm font-normal">ל׳</span>
-            </p>
-            <p className="text-xs mb-1" style={{ color: palette.mutedInk }}>מתוך {(dailyWaterGoal / 1000).toFixed(1)} ליטר ליום</p>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-2xl font-semibold" style={{ color: palette.waterAccent }}>
+                {(totalWater / 1000).toFixed(2)} <span className="text-sm font-normal">ל׳</span>
+              </p>
+              <button
+                onClick={() => {
+                  setWaterGoalInput(String(dailyWaterGoal));
+                  setIsEditingWaterGoal(true);
+                }}
+                className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px]"
+                style={{ background: palette.waterAccentSoft, color: palette.waterAccent }}
+                title="עריכת יעד מים"
+              >
+                יעד {(dailyWaterGoal / 1000).toFixed(1)} ל׳ <Pencil size={10} />
+              </button>
+            </div>
+            <p className="text-xs mb-1" style={{ color: palette.mutedInk }}>מתוך יעד המים היומי</p>
             <p className="text-sm" style={{ color: waterGoalReached ? palette.tasksAccent : palette.mutedInk }}>
               {waterGoalReached ? "🎉 הגעת ליעד היום!" : `נשארו ${Math.max(0, ((dailyWaterGoal - totalWater) / 1000)).toFixed(2)} ל׳`}
             </p>
@@ -2023,27 +2085,9 @@ function WaterView({ totalWater, waterPct, waterGoalReached, dailyWaterGoal, wat
         </div>
       </Card>
 
-      <Card>
-        <p className="text-sm font-medium mb-2">יעד מים יומי</p>
-        {!isEditingWaterGoal ? (
-          <div className="flex items-center justify-between rounded-xl px-3 py-2" style={{ background: palette.bg, border: `1px solid ${palette.border}` }}>
-            <span className="text-sm" style={{ color: palette.mutedInk }}>היעד שהוגדר</span>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold" style={{ color: palette.waterAccent }}>{dailyWaterGoal} מ״ל</span>
-              <button
-                onClick={() => {
-                  setWaterGoalInput(String(dailyWaterGoal));
-                  setIsEditingWaterGoal(true);
-                }}
-                className="rounded-lg p-1.5"
-                style={{ background: palette.waterAccentSoft, color: palette.waterAccent }}
-                title="עריכת יעד מים"
-              >
-                <Pencil size={14} />
-              </button>
-            </div>
-          </div>
-        ) : (
+      {isEditingWaterGoal && (
+        <Card>
+          <p className="text-sm font-medium mb-2">עריכת יעד מים יומי</p>
           <div className="flex gap-2">
             <input
               value={waterGoalInput}
@@ -2070,9 +2114,9 @@ function WaterView({ totalWater, waterPct, waterGoalReached, dailyWaterGoal, wat
               ביטול
             </button>
           </div>
-        )}
-        <p className="text-[11px] mt-2" style={{ color: palette.mutedInk }}>היעד נשמר במכשיר וישפיע על כל יום קדימה.</p>
-      </Card>
+          <p className="text-[11px] mt-2" style={{ color: palette.mutedInk }}>היעד נשמר במכשיר וישפיע על כל יום קדימה.</p>
+        </Card>
+      )}
 
       <Card>
         <p className="text-sm font-medium mb-3">הוספת שתייה</p>
